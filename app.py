@@ -15,8 +15,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.config.suppress_callback_exceptions = True
 
 # data
-df = pd.read_csv("data/HRDataset_v9.csv")
+df = pd.read_csv("data/data.csv")
 df["Date of Hire"] = pd.to_datetime(df["Date of Hire"])
+df["Date of Termination"] = pd.to_datetime(df["Date of Termination"])
 
 employee_source = df["Employee Source"].value_counts(ascending=True)
 
@@ -267,10 +268,11 @@ def update_recruit_source(filter_value_name):
             [Input("active_filter", "value")])
 def update_manager_list(selected_active):
     options = [{"label": i, "value":i} for i in df["Manager Name"].unique()]
+    value = "Janet King"
     if selected_active in ["Department", "Position"]:
         return options, None, True
     else:
-        return options, "Board of Directors", False
+        return options, value, False
 
 
 @app.callback(Output("active_per_variable", "figure"),
@@ -311,4 +313,4 @@ def display_page(tab):
         return 404
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False)
