@@ -20,16 +20,19 @@ df["Date of Hire"] = pd.to_datetime(df["Date of Hire"])
 
 employee_source = df["Employee Source"].value_counts(ascending=True)
 
+tab_style = {'fontSize':18}
+tab_selected_style = {'fontSize':20}
+
 app.layout = html.Div([
     html.Div([
-        html.H1("HR Dashboard", style={"textAlign": "center"}),
+        html.H2("HR Dashboard", style={"textAlign": "center"}),
         html.Img(src="assets/logo.png")
     ], className="banner"),
-    dcc.Tabs(id="tabs-example", value='recruit', children=[
-        dcc.Tab(label="Recruitment", value='recruit'),
-        dcc.Tab(label="Diversity Profile", value="diversity"),
-        dcc.Tab(label="Hiring Time Series", value="hire"),
-        dcc.Tab(label="Data Table", value="data_table"),
+    dcc.Tabs(id="tabs", value='recruit', children=[
+        dcc.Tab(label="Recruitment", value="recruit", style=tab_style, selected_style=tab_selected_style),
+        dcc.Tab(label="Diversity Profile", value="diversity", style=tab_style, selected_style=tab_selected_style),
+        dcc.Tab(label="Head Count", value="head_count", style=tab_style, selected_style=tab_selected_style),
+        dcc.Tab(label="Data Table", value="data_table", style=tab_style, selected_style=tab_selected_style),
     ]),
     html.Div(id="page-content")
 ])
@@ -117,14 +120,34 @@ diversity = html.Div([
 
 ])
 
-# Hire date
-line = df["Date of Hire"].value_counts().sort_index()
-hire = html.Div([
+# headcount
+hire = df["Date of Hire"].value_counts().sort_index()
+term = df["Date of Termination"].value_counts().sort_index()
+emp_count = hire.sub(term, fill_value=0)
+idx = pd.date_range(emp_count.index.min(), emp_count.index.max())
+emp_count = emp_count.reindex(idx, fill_value=0)
+
+
+# attrition_rate
+day = emp_count.index.max().day
+month = emp_count.index.max().month
+year = emp_count.index.max().year
+
+last_month = emp_count[emp_count.index=="{}-{}-{}".format(year, month-1, day)][0]
+this_month = emp_count[emp_count.index=="{}-{}-{}".format(year, month, day)][0]
+avg = (last_month+this_month)/2
+attritions = term[(term.index>="{}-{}-{}"\
+                   .format(year, month-1, day)) & (term.index<="{}-{}-{}"\
+                                                   .format(year, month, day))]
+attritions = 0 if len(attritions)==0 else attrition
+attrition_rate = np.round(attritions/avg,2)
+
+head_count = html.Div([
     html.Div([
         dcc.Graph(
-            id = "hire_series",
-            figure = {"data": [go.Scatter(x = list(line.index), y=list(line.values), line={"color":"#f44242"})],
-                  "layout": go.Layout(title = "Hiring Time Series",
+            id = "head_count_plot",
+            figure = {"data": [go.Scatter(x = list(emp_count.cumsum().index), y=list(emp_count.cumsum().values), line={"color":"#83db7b"})],
+                  "layout": go.Layout(title = "Head Count",
                                       xaxis=dict(
                                             rangeselector=dict(
                                                 buttons=list([
@@ -147,11 +170,16 @@ hire = html.Div([
                                                     dict(step="all")
                                                     ])
                                                 ),
-                                            rangeslider=dict(visible=True)
+                                            rangeslider={"visible":True}
                                             )
                                     )}
-        )
+        ),
+        html.Div([
+            html.P("Monthly Attrition Rate", style={"fontWeight":"30pt","textAlign":"center"}),
+            html.H4("{}".format(attrition_rate), style={"textAlign":"center"})
+        ], style={"border": "thin lightgrey solid", "padding": "20px 0px 0px 0px"})
     ], className="row")
+
 ])
 
 # data table
@@ -199,7 +227,7 @@ def update_recruit_source(filter_value_name):
 
 # update page
 @app.callback(Output('page-content', 'children'),
-              [Input('tabs-example', 'value')])
+              [Input('tabs', 'value')])
 def display_page(tab):
     if tab == "recruit":
         return recruit
@@ -207,8 +235,8 @@ def display_page(tab):
         return data_table
     elif tab == "diversity":
         return diversity
-    elif tab == "hire":
-        return hire
+    elif tab == "head_count":
+        return head_count
     else:
         return 404
 
