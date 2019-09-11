@@ -28,10 +28,10 @@ app.layout = html.Div([
         html.H2("HR Dashboard", style={"textAlign": "center"}),
         html.Img(src="assets/logo.png")
     ], className="banner"),
-    dcc.Tabs(id="tabs", value='recruit', children=[
-        dcc.Tab(label="Recruitment", value="recruit", style=tab_style, selected_style=tab_selected_style),
+    dcc.Tabs(id="tabs", value='head_count', children=[
+        dcc.Tab(label="Head Count & Attrition", value="head_count", style=tab_style, selected_style=tab_selected_style),
         dcc.Tab(label="Diversity Profile", value="diversity", style=tab_style, selected_style=tab_selected_style),
-        dcc.Tab(label="Head Count", value="head_count", style=tab_style, selected_style=tab_selected_style),
+        dcc.Tab(label="Recruitment", value="recruit", style=tab_style, selected_style=tab_selected_style),
         dcc.Tab(label="Data Table", value="data_table", style=tab_style, selected_style=tab_selected_style),
     ]),
     html.Div(id="page-content")
@@ -49,7 +49,7 @@ recruit = html.Div([
     ], className="row"),
 
     html.Div([
-        html.Label("Filter by:"),
+        html.Label("Filter details by:"),
         dcc.Dropdown(
             id="filter_value",
             options = [
@@ -57,7 +57,7 @@ recruit = html.Div([
                 {"label": "State", "value": "State"}
             ], value="Department"
         )
-    ]),
+    ], className="row", style={"width": "15%"}),
 
     html.Div([
         html.Div([
@@ -125,7 +125,9 @@ hire = df["Date of Hire"].value_counts().sort_index()
 term = df["Date of Termination"].value_counts().sort_index()
 emp_count = hire.sub(term, fill_value=0)
 idx = pd.date_range(emp_count.index.min(), emp_count.index.max())
-emp_count = emp_count.reindex(idx, fill_value=0)
+emp_count = emp_count.reindex(idx, fill_value=0).cumsum()
+
+active = df["Employment Status"].value_counts()["Active"]
 
 
 # attrition_rate
@@ -142,44 +144,82 @@ attritions = term[(term.index>="{}-{}-{}"\
 attritions = 0 if len(attritions)==0 else attrition
 attrition_rate = np.round(attritions/avg,2)
 
+# employees by "variable"
+
+
 head_count = html.Div([
     html.Div([
-        dcc.Graph(
-            id = "head_count_plot",
-            figure = {"data": [go.Scatter(x = list(emp_count.cumsum().index), y=list(emp_count.cumsum().values), line={"color":"#83db7b"})],
-                  "layout": go.Layout(title = "Head Count",
-                                      xaxis=dict(
-                                            rangeselector=dict(
-                                                buttons=list([
-                                                    dict(count=1,
-                                                         label="1m",
-                                                         step="month",
-                                                         stepmode="backward"),
-                                                    dict(count=6,
-                                                         label="6m",
-                                                         step="month",
-                                                         stepmode="backward"),
-                                                    dict(count=1,
-                                                         label="YTD",
-                                                         step="year",
-                                                         stepmode="todate"),
-                                                    dict(count=1,
-                                                         label="1y",
-                                                         step="year",
-                                                         stepmode="backward"),
-                                                    dict(step="all")
-                                                    ])
-                                                ),
-                                            rangeslider={"visible":True}
-                                            )
-                                    )}
-        ),
+        html.Div([
+            dcc.Graph(
+                id = "head_count_plot",
+                figure = {"data": [go.Scatter(x = list(emp_count.index), y=list(emp_count.values), line={"color":"#83db7b"})],
+                      "layout": go.Layout(title = "Number of Employees",
+                                          xaxis=dict(
+                                                rangeselector=dict(
+                                                    buttons=list([
+                                                        dict(count=1,
+                                                             label="1m",
+                                                             step="month",
+                                                             stepmode="backward"),
+                                                        dict(count=6,
+                                                             label="6m",
+                                                             step="month",
+                                                             stepmode="backward"),
+                                                        dict(count=1,
+                                                             label="YTD",
+                                                             step="year",
+                                                             stepmode="todate"),
+                                                        dict(count=1,
+                                                             label="1y",
+                                                             step="year",
+                                                             stepmode="backward"),
+                                                        dict(step="all")
+                                                        ])
+                                                    ),
+                                                rangeslider={"visible":True}
+                                                )
+                                        )}
+            )
+        ], className="ten columns"),
+
         html.Div([
             html.P("Monthly Attrition Rate", style={"fontWeight":"30pt","textAlign":"center"}),
             html.H4("{}".format(attrition_rate), style={"textAlign":"center"})
-        ], style={"border": "thin lightgrey solid", "padding": "20px 0px 0px 0px"})
-    ], className="row")
+        ], className="two columns", style={"border": "thin lightgrey solid", "margin": "20px 0px 0px 0px"}),
 
+        html.Div([
+            html.P("No. of Employees", style={"fontWeight":"30pt","textAlign":"center"}),
+            html.H4("{}".format(active), style={"textAlign":"center"})
+        ], className="two columns", style={"border": "thin lightgrey solid", "margin": "20px 0px 0px 0px"}),
+    ], className="row"),
+
+    html.Div([
+        html.Div([
+            html.Label("Filter details by:"),
+            dcc.Dropdown(
+                id="active_filter",
+                options = [
+                    {"label": "Department", "value": "Department"},
+                    {"label": "Position", "value": "Position"},
+                    {"label": "Manager", "value": "Manager"}
+                ], value="Department", clearable=False
+            ),
+            html.Label("Specifics:"),
+            dcc.Dropdown(
+                    id="managers",
+                    placeholder="Applies only to Managers")
+        ], className="row", style={"width": "15%"}),
+
+        html.Div([
+            html.Div([
+                dcc.Graph(
+                    id="active_per_variable",
+                    figure={"data": [go.Histogram(name=i, x=df[df["Department"]==i]["Employment Status"]) for i in df["Department"].unique()],
+                            }
+                    )
+                ])
+        ])
+    ], className="row")
 ])
 
 # data table
@@ -216,14 +256,44 @@ def update_table(page_current, page_size):
 @app.callback(Output("Recruitment Source by Department", "figure"),
             [Input("filter_value", "value")])
 def update_recruit_source(filter_value_name):
-    # figure = px.histogram(df, x="Employee Source", color=filter_value_name,
-    #     histfunc="count", barnorm="percent", barmode="group", orientation="v",
-    #     title="Details by {}".format(filter_value_name)).update_yaxes(title="Percentage of Recruitments")
     figure={"data": [go.Histogram(name=i,
                         x=df[df[filter_value_name]==i]["Employee Source"]) for i in df[filter_value_name].unique()],
-            # "layout": go.Layout(yaxis=go.layout.YAxis(title=go.layout.yaxis.Title(text="Percentage by Source")))
             }
     return figure
+
+@app.callback([Output("managers","options"),
+                Output("managers", "value"),
+                Output("managers", "disabled")],
+            [Input("active_filter", "value")])
+def update_manager_list(selected_active):
+    options = [{"label": i, "value":i} for i in df["Manager Name"].unique()]
+    if selected_active in ["Department", "Position"]:
+        return options, None, True
+    else:
+        return options, "Board of Directors", False
+
+
+@app.callback(Output("active_per_variable", "figure"),
+              [Input("active_filter", "value"),
+               Input("managers", "value")])
+def update_active_employees(selected_active, selected_managers):
+    if selected_active in ["Department", "Position"]:
+        figure={"data": [go.Histogram(name=i, x=df[df[selected_active]==i]["Employment Status"]) for i in df[selected_active].unique()]}
+    else:
+        figure={"data": [go.Bar(name=selected_managers,
+                        x=df[(df["Manager Name"]==selected_managers)]["Employment Status"].value_counts().index,
+                        y=df[(df["Manager Name"]==selected_managers)]["Employment Status"].value_counts().values)]}
+    return figure
+
+# @app.callback(Output("managers", "value"),
+#                 [Input("active_filter", "value")])
+# @app.callback(Output("active_per_variable","figure"),
+#             [Input("managers", "value")])
+# def update_manager_filter(value):
+#     # data = [go.Bar(name=i, x=df[(df["Manager Name"]==i)]["Employment Status"].value_counts().index,
+#     #         y=df[(df["Manager Name"]==i)]["Employment Status"].value_counts().values) for i in value]
+#     # figure={"data":data}
+#     return "figure"
 
 # update page
 @app.callback(Output('page-content', 'children'),
