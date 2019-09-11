@@ -4,6 +4,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 import dash_table
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objs as go
 import matplotlib.pyplot as plt
@@ -12,51 +13,29 @@ plt.style.use("tableau-colorblind10")
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.config.suppress_callback_exceptions = True
-#
-# colors = {
-#     'background': 'white',
-#     'text': '#7FDBFF'
-# }
 
-def generate_table(dataframe):
-    return html.Div([
-        html.Div(
-            html.Table(
-                # Header
-                [html.Tr([html.Th(col) for col in dataframe.columns])] +
-
-                # Body
-                [html.Tr([
-                    html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-                ]) for i in range(len(dataframe))]
-            ), style={"width":"100%", "overflow":"scroll"}
-        )
-    ], style={"height": "100%"})
-
-
-# data = go.Bar(y=employee_source.index,
-#              x=employee_source.values, orientation="h")
-#
-# layout = go.Layout(title="Recruitment Source",
-#                   plot_bgcolor="rgb(230,230,230)", bargap=0.2)
-#
-# fig = go.Figure(data=[data], layout=layout)
-
+# data
 df = pd.read_csv("data/HRDataset_v9.csv")
+df["Date of Hire"] = pd.to_datetime(df["Date of Hire"])
 
 employee_source = df["Employee Source"].value_counts(ascending=True)
 
 app.layout = html.Div([
-    dcc.Location(id="url", refresh=False),
-    html.Div(id="page-content")
-])
-
-recruit = html.Div([
     html.Div([
         html.H1("HR Dashboard", style={"textAlign": "center"}),
         html.Img(src="assets/logo.png")
     ], className="banner"),
+    dcc.Tabs(id="tabs-example", value='recruit', children=[
+        dcc.Tab(label="Recruitment", value='recruit'),
+        dcc.Tab(label="Diversity Profile", value="diversity"),
+        dcc.Tab(label="Hiring Time Series", value="hire"),
+        dcc.Tab(label="Data Table", value="data_table"),
+    ]),
+    html.Div(id="page-content")
+])
 
+# recruitment sources
+recruit = html.Div([
     html.Div([
         dcc.Graph(
             id="Recruitment Source",
@@ -81,17 +60,101 @@ recruit = html.Div([
         html.Div([
             dcc.Graph(
                 id="Recruitment Source by Department",
-                figure = px.histogram(df, x="Employee Source", color="Department",
-                    histfunc="count", barnorm="percent", barmode="group", orientation="v",
-                    title="Details by Department").update_yaxes(title="Percentage of Recruitments"))
-                ])
+                # figure = px.histogram(df, x="Employee Source", color="Department",
+                #     histfunc="count", barnorm="percent", barmode="group", orientation="v",
+                #     title="Details by Department").update_yaxes(title="Percentage of Recruitments")
+                figure={"data": [go.Histogram(name=i,
+                                    x=df[df["Department"]==i]["Employee Source"]) for i in df["Department"].unique()],
+                        # "layout": go.Layout(yaxis=go.layout.YAxis(title=go.layout.yaxis.Title(text="Percentage by Source")))
+                        }
+                )
+            ])
     ], className="row")
 ])
 
-data = html.Div([
-    generate_table(df)
+# diversity Profile
+dept_gender = df.groupby(["Sex"])["Department"].value_counts()
+dept_race = df.groupby(["RaceDesc"])["Department"].value_counts()
+gender_ratio = np.round(df[df["Sex"]=="Male"].shape[0]/df[df["Sex"]=="Female"].shape[0],2)
+diversity = html.Div([
+    html.Div([
+        html.Div([
+            dcc.Graph(
+                id="gender",
+                figure = {"data": [go.Bar(name=i, x=dept_gender[i].index,
+                               y=dept_gender[i], opacity=0.9) for i in df["Sex"].unique()],
+                          "layout": go.Layout(
+                              title = "Gender by Department",
+                              barmode = "stack",
+                              barnorm = "percent",
+                              bargap = 0.4)
+                          }
+            )
+        ], className="ten columns"),
+
+        html.Div([
+            html.P("Male-to-Female Ratio", style={"fontWeight":"30pt","textAlign":"center"}),
+            html.H4("1 : {}".format(gender_ratio), style={"textAlign":"center"})
+        ], className="two columns", style={"border": "thin lightgrey solid",
+                                           "padding": "20px 0px 0px 0px"})
+    ], className="row"),
+
+    html.Div([
+        html.Div([
+            dcc.Graph(
+                id="race",
+                figure = {"data": [go.Bar(name=i, x=dept_race[i].index,
+                               y=dept_race[i], opacity=0.9) for i in df["RaceDesc"].unique()],
+                          "layout": go.Layout(
+                              title = "Race by Department",
+                              barmode = "group",
+                              barnorm = "percent",
+                              bargap = 0.4)
+                          }
+            )
+        ], className="ten columns"),
+    ], className="row")
+
 ])
 
+# Hire date
+line = df["Date of Hire"].value_counts().sort_index()
+hire = html.Div([
+    html.Div([
+        dcc.Graph(
+            id = "hire_series",
+            figure = {"data": [go.Scatter(x = list(line.index), y=list(line.values), line={"color":"#f44242"})],
+                  "layout": go.Layout(title = "Hiring Time Series",
+                                      xaxis=dict(
+                                            rangeselector=dict(
+                                                buttons=list([
+                                                    dict(count=1,
+                                                         label="1m",
+                                                         step="month",
+                                                         stepmode="backward"),
+                                                    dict(count=6,
+                                                         label="6m",
+                                                         step="month",
+                                                         stepmode="backward"),
+                                                    dict(count=1,
+                                                         label="YTD",
+                                                         step="year",
+                                                         stepmode="todate"),
+                                                    dict(count=1,
+                                                         label="1y",
+                                                         step="year",
+                                                         stepmode="backward"),
+                                                    dict(step="all")
+                                                    ])
+                                                ),
+                                            rangeslider=dict(visible=True)
+                                            )
+                                    )}
+        )
+    ], className="row")
+])
+
+# data table
 data_table = html.Div([
     dash_table.DataTable(
         id = "datatable-paging",
@@ -108,7 +171,7 @@ data_table = html.Div([
         css = [{"selector": ".dash-cell div.dash-cell-value",
                 "rule": "display: inline; white-space: inherit; overflow: inherit; text-overflow: inherit;"}],
         page_current = 0,
-        page_size = 15,
+        page_size = 10,
         page_action = "custom"
     )
 ], style={"width": "100%"})
@@ -125,21 +188,27 @@ def update_table(page_current, page_size):
 @app.callback(Output("Recruitment Source by Department", "figure"),
             [Input("filter_value", "value")])
 def update_recruit_source(filter_value_name):
-    figure = px.histogram(df, x="Employee Source", color=filter_value_name,
-        histfunc="count", barnorm="percent", barmode="group", orientation="v",
-        title="Details by {}".format(filter_value_name)).update_yaxes(title="Percentage of Recruitments")
+    # figure = px.histogram(df, x="Employee Source", color=filter_value_name,
+    #     histfunc="count", barnorm="percent", barmode="group", orientation="v",
+    #     title="Details by {}".format(filter_value_name)).update_yaxes(title="Percentage of Recruitments")
+    figure={"data": [go.Histogram(name=i,
+                        x=df[df[filter_value_name]==i]["Employee Source"]) for i in df[filter_value_name].unique()],
+            # "layout": go.Layout(yaxis=go.layout.YAxis(title=go.layout.yaxis.Title(text="Percentage by Source")))
+            }
     return figure
 
 # update page
-@app.callback(Output("page-content", "children"),
-            [Input("url", "pathname")])
-def display_page(pathname):
-    if pathname == "/":
+@app.callback(Output('page-content', 'children'),
+              [Input('tabs-example', 'value')])
+def display_page(tab):
+    if tab == "recruit":
         return recruit
-    elif pathname == "/data/":
-        return data
-    elif pathname == "/data-table/":
+    elif tab == "data_table":
         return data_table
+    elif tab == "diversity":
+        return diversity
+    elif tab == "hire":
+        return hire
     else:
         return 404
 
