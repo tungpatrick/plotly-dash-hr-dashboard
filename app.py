@@ -288,16 +288,6 @@ def update_active_employees(selected_active, selected_managers):
                         y=df[(df["Manager Name"]==selected_managers)]["Employment Status"].value_counts().values)]}
     return figure
 
-# @app.callback(Output("managers", "value"),
-#                 [Input("active_filter", "value")])
-# @app.callback(Output("active_per_variable","figure"),
-#             [Input("managers", "value")])
-# def update_manager_filter(value):
-#     # data = [go.Bar(name=i, x=df[(df["Manager Name"]==i)]["Employment Status"].value_counts().index,
-#     #         y=df[(df["Manager Name"]==i)]["Employment Status"].value_counts().values) for i in value]
-#     # figure={"data":data}
-#     return "figure"
-
 # update page
 @app.callback(Output('page-content', 'children'),
               [Input('tabs', 'value')])

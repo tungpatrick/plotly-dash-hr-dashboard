@@ -27,4 +27,4 @@ To serve the app locally:
 python3 app.py
 ```
 
-The web app will be launched to your localhost on port 8050: [http://127.0.0.1:8050]
+The web app will be launched to your localhost on port 8050: http://127.0.0.1:8050
