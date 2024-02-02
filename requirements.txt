@@ -1,4 +1,4 @@
-dash==1.2.0
+dash==2.15.0
 dash_table==4.2.0
 pandas==0.24.2
 numpy==1.16.2
